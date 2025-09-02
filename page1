@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configurateur de Table Personnalisée en 3D</title>
+  <!-- Importation de Three.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Importation des contrôles d'orbit pour pouvoir faire tourner la table -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+  <style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f8f9fa;
+    display: flex;
+    min-height: 100vh;
+    color: #333;
+  }
+
+  .container {
+    width: 90%;
+    margin: 20px auto;
+    background-color: #fff;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+  }
+
+  /* Style pour la section de rendu 3D */
+  .render-section {
+    width: 60%;
+    padding: 0;
+    box-sizing: border-box;
+    position: relative;
+  }
+
+  #table-render {
+    width: 100%;
+    height: 500px;
+    background-color: #f0f0f0;
+    overflow: hidden;
+  }
+
+  #instructions {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background-color: rgba(255, 255, 255, 0.7);
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    pointer-events: none;
+  }
+
+  /* Style pour la section de configuration */
+  .config-section {
+    width: 40%;
+    padding: 30px;
+    box-sizing: border-box;
+    background-color: #fff;
+    border-left: 1px solid #eaeaea;
+  }
+
+  h2 {
+    margin-top: 0;
+    color: #2c3e50;
+    font-weight: 600;
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+  }
+
+  .form-group {
+    margin-bottom: 25px;
+  }
+
+  label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #555;
+    font-size: 0.9em;
+  }
+
+  select, input[type="number"] {
+    width: 100%;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    box-sizing: border-box;
+    margin-top: 5px;
+    font-size: 16px;
+    transition: border-color 0.3s;
+    background-color: #fcfcfc;
+  }
+
+  select:focus, input[type="number"]:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+  }
+
+  .dimensions-container {
+    display: flex;
+    gap: 15px;
+  }
+
+  .width-group, .length-group {
+    flex: 1;
+  }
+
+  /* Style pour le bouton de réinitialisation */
+  .reset-button {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.3s;
+    margin-top: 20px;
+  }
+
+  .reset-button:hover {
+    background-color: #c0392b;
+  }
+
+  /* Message de chargement des textures */
+  #loading-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 5px;
+    font-weight: 600;
+    display: none;
+  }
+
+  /* Status des textures */
+  #texture-status {
+    position: absolute;
+    bottom: 40px;
+    left: 10px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    display: none;
+  }
+
+  /* Responsive design */
+  @media (max-width: 768px) {
+    .container {
+      flex-direction: column;
+    }
+    
+    .render-section, .config-section {
+      width: 100%;
+    }
+    
+    .render-section {
+      height: 350px;
+    }
+    
+    #table-render {
+      height: 100%;
+    }
+  }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Section de rendu 3D -->
+    <section class="render-section">
+      <div id="table-render"></div>
+      <div id="instructions">Cliquez et faites glisser pour faire pivoter la table</div>
+      <div id="loading-message">Chargement des textures...</div>
+      <div id="texture-status"></div>
+    </section>
+
+    <!-- Section de configuration -->
+    <section class="config-section">
+      <h2>Les tables de tonton Hassan</h2>
+      <div class="form-group">
+        <label for="table-shape">Forme du Plateau:</label>
+        <select id="table-shape" name="table-shape">
+          <option value="rond">Rond</option>
+          <option value="carre">Carré</option>
+          <option value="rectangle" selected>Rectangle</option>
+        </select>
+      </div>
+
+      <div class="dimensions-container">
+        <div class="form-group width-group">
+          <label for="table-width">Largeur (cm):</label>
+          <input type="number" id="table-width" name="table-width" value="80" min="40" max="200">
+        </div>
+
+        <div class="form-group length-group">
+          <label for="table-length">Longueur (cm):</label>
+          <input type="number" id="table-length" name="table-length" value="120" min="40" max="300">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="table-legs">Type de Pieds:</label>
+        <select id="table-legs" name="table-legs">
+          <option value="4-pieds" selected>4 Pieds</option>
+          <option value="2-pieds">2 Pieds Centraux</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="table-material">Matériau du Plateau:</label>
+        <select id="table-material" name="table-material">
+          <option value="travertin" selected>Travertin</option>
+          <option value="marbre-blanc">Marbre Blanc</option>
+          <option value="granit-noir">Granit Noir</option>
+        </select>
+      </div>
+      
+      <button class="reset-button" id="reset-config">Réinitialiser</button>
+    </section>
+  </div>
+
+  <script>
+    // Variables Three.js
+    let scene, camera, renderer, controls;
+    let table = new THREE.Group(); // Groupe pour contenir tous les éléments de la table
+    
+    // Éléments du formulaire
+    const tableShapeSelect = document.getElementById('table-shape');
+    const tableWidthInput = document.getElementById('table-width');
+    const tableLengthInput = document.getElementById('table-length');
+    const tableLegsSelect = document.getElementById('table-legs');
+    const tableMaterialSelect = document.getElementById('table-material');
+    const resetButton = document.getElementById('reset-config');
+    const renderContainer = document.getElementById('table-render');
+    const loadingMessage = document.getElementById('loading-message');
+    const textureStatus = document.getElementById('texture-status');
+    
+    // Configuration des lumières
+    const lightIntensity = 1.0;
+    
+    // Définition des couleurs de base pour chaque matériau
+    const materialColors = {
+      'travertin': 0xE1D9C4,
+      'marbre-blanc': 0xF5F5F5,
+      'granit-noir': 0x444444
+    };
+    
+    // Initialisation de la scène Three.js
+    function initThreeJS() {
+      // Création de la scène
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xf0f0f0);
+      
+      // Création de la caméra
+      const aspect = renderContainer.clientWidth / renderContainer.clientHeight;
+      camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
+      camera.position.set(0, 100, 300);
+      
+      // Création du renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(renderContainer.clientWidth, renderContainer.clientHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderContainer.innerHTML = '';
+      renderContainer.appendChild(renderer.domElement);
+      
+      // Ajout des contrôles pour faire tourner la table
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.25;
+      controls.minDistance = 100;
+      controls.maxDistance = 500;
+      controls.maxPolarAngle = Math.PI / 2;
+      
+      // Mise en place de l'éclairage
+      setupLighting();
+      
+      // Ajout d'un plan au sol pour avoir une référence
+      const planeGeometry = new THREE.PlaneGeometry(500, 500);
+      const planeMaterial = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.1, roughness: 0.9 });
+      const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+      plane.rotation.x = -Math.PI / 2;
+      plane.position.y = -50;
+      plane.receiveShadow = true;
+      scene.add(plane);
+      
+      // Ajout du groupe table à la scène
+      scene.add(table);
+      
+      // Mise à jour initiale de la table
+      updateTable();
+      
+      // Animation
+      animate();
+    }
+    
+    function setupLighting() {
+      // Suppression des lumières existantes
+      scene.children.forEach(child => {
+        if (child instanceof THREE.Light) {
+          scene.remove(child);
+        }
+      });
+      
+      // Lumière ambiante
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5 * lightIntensity);
+      scene.add(ambientLight);
+      
+      // Lumière directionnelle principale (comme le soleil)
+      const mainLight = new THREE.DirectionalLight(0xffffff, 0.2 * lightIntensity);
+      mainLight.position.set(200, 200, 100);
+      mainLight.castShadow = true;
+      mainLight.shadow.camera.near = 0.5;
+      mainLight.shadow.camera.far = 500;
+      mainLight.shadow.camera.left = -200;
+      mainLight.shadow.camera.right = 200;
+      mainLight.shadow.camera.top = 200;
+      mainLight.shadow.camera.bottom = -200;
+      mainLight.shadow.mapSize.width = 1024;
+      mainLight.shadow.mapSize.height = 1024;
+      scene.add(mainLight);
+      
+      // Lumière de remplissage d'un côté opposé
+      const fillLight = new THREE.DirectionalLight(0xffffff, 0.4 * lightIntensity);
+      fillLight.position.set(-100, 100, -100);
+      scene.add(fillLight);
+      
+      // Lumière pour éclairer le dessous de la table
+      const bottomLight = new THREE.DirectionalLight(0xffffff, 0.2 * lightIntensity);
+      bottomLight.position.set(0, -100, 0);
+      scene.add(bottomLight);
+    }
+    
+    // Fonction pour créer/mettre à jour la table
+    function updateTable() {
+      // Suppression de l'ancienne table
+      while(table.children.length > 0) { 
+        table.remove(table.children[0]); 
+      }
+      
+      const shape = tableShapeSelect.value;
+      const width = parseInt(tableWidthInput.value) || 80;
+      const length = parseInt(tableLengthInput.value) || 120;
+      const legsType = tableLegsSelect.value;
+      const material = tableMaterialSelect.value;
+      
+      // Création du plateau
+      let plateauGeometry;
+      const thickness = 5; // Épaisseur du plateau
+      
+      // Matériau du plateau avec couleur de base (sans texture pour l'instant)
+      const plateauMaterial = new THREE.MeshStandardMaterial({
+        color: materialColors[material],
+        roughness: 0.5,
+        metalness: 0.1
+      });
+      
+      // Charge la texture après avoir créé le matériau
+      loadTexture(material, plateauMaterial);
+      
+      let plateau;
+      
+      if (shape === 'rond') {
+        // Pour un plateau rond, utilisez une géométrie de cylindre
+        const radius = Math.min(width, length) / 2;
+        plateauGeometry = new THREE.CylinderGeometry(radius, radius, thickness, 32);
+        plateau = new THREE.Mesh(plateauGeometry, plateauMaterial);
+        
+        // Rotation pour que le cylindre soit horizontal
+        plateau.rotation.x = Math.PI / 2;
+        
+      } else if (shape === 'carre') {
+        plateauGeometry = new THREE.BoxGeometry(width, thickness, width);
+        plateau = new THREE.Mesh(plateauGeometry, plateauMaterial);
+      } else { // rectangle
+        plateauGeometry = new THREE.BoxGeometry(width, thickness, length);
+        plateau = new THREE.Mesh(plateauGeometry, plateauMaterial);
+      }
+      
+      plateau.castShadow = true;
+      plateau.receiveShadow = true;
+      table.add(plateau);
+      
+      // Calculs pour les pieds
+      const legMaterial = new THREE.MeshStandardMaterial({
+        color: 0x333333,
+        roughness: 0.8,
+        metalness: 0.2
+      });
+      const legHeight = 70;
+      const legThickness = 4;
+      
+      // Ajout des pieds
+      if (legsType === '4-pieds') {
+        // 4 pieds aux coins
+        const radius = shape === 'rond' ? Math.min(width, length) / 2 : 0;
+        const offsetX = shape === 'rond' ? radius * 0.7 : width / 2 - legThickness / 2;
+        const offsetZ = shape === 'rond' ? radius * 0.7 : (shape === 'carre' ? width / 2 - legThickness / 2 : length / 2 - legThickness / 2);
+        
+        // Création des 4 pieds
+        for (let x = -1; x <= 1; x += 2) {
+          for (let z = -1; z <= 1; z += 2) {
+            const legGeometry = new THREE.BoxGeometry(legThickness, legHeight, legThickness);
+            const leg = new THREE.Mesh(legGeometry, legMaterial);
+            leg.position.set(x * offsetX, -legHeight / 2 - thickness / 2, z * offsetZ);
+            leg.castShadow = true;
+            table.add(leg);
+          }
+        }
+      } else {
+        // 2 pieds centraux
+        const baseWidth = Math.min(width * 0.4, 30);
+        const baseGeometry = new THREE.BoxGeometry(baseWidth, legThickness, length * 0.6);
+        const base = new THREE.Mesh(baseGeometry, legMaterial);
+        base.position.y = -legHeight - thickness / 2;
+        base.castShadow = true;
+        table.add(base);
+        
+        // Pieds verticaux
+        const radius = shape === 'rond' ? Math.min(width, length) / 2 : 0;
+        for (let z = -1; z <= 1; z += 2) {
+          const pillarGeometry = new THREE.BoxGeometry(baseWidth / 4, legHeight, legThickness);
+          const pillar = new THREE.Mesh(pillarGeometry, legMaterial);
+          pillar.position.set(0, -legHeight / 2 - thickness / 2, z * (shape === 'rond' ? radius * 0.5 : length * 0.25));
+          pillar.castShadow = true;
+          table.add(pillar);
+        }
+      }
+      
+      // Ajuster la hauteur de la caméra en fonction de la taille de la table
+      const tableSize = Math.max(width, length);
+      camera.position.set(tableSize * 1.5, tableSize, tableSize * 1.5);
+      controls.update();
+    }
+    
+    // Fonction pour charger une texture pour un matériau spécifique
+    function loadTexture(materialType, material) {
+      loadingMessage.style.display = 'block';
+      textureStatus.style.display = 'block';
+      textureStatus.textContent = 'Chargement de la texture...';
+      
+      let textureUrl;
+      
+      switch (materialType) {
+        case 'travertin':
+          textureUrl = 'https://i.ibb.co/jPs0qp95/travertin.jpg';
+          break;
+        case 'marbre-blanc':
+          textureUrl = 'https://i.ibb.co/nJvMKY9/marbre-blanc-2.jpg';
+          break;
+        case 'granit-noir':
+          textureUrl = 'https://i.ibb.co/201j1m1C/granit.jpg';
+          break;
+        default:
+          textureUrl = 'https://i.ibb.co/jPs0qp95/travertin.jpg';
+      }
+      
+      const textureLoader = new THREE.TextureLoader();
+      
+      textureLoader.load(
+        textureUrl,
+        function(texture) {
+          // Succès
+          texture.wrapS = THREE.RepeatWrapping;
+          texture.wrapT = THREE.RepeatWrapping;
+          
+          // La valeur de répétition dépend du matériau
+          if (materialType === 'marbre-blanc') {
+            texture.repeat.set(1, 1);
+          } else if (materialType === 'granit-noir') {
+            texture.repeat.set(1, 1);
+          } else { // travertin
+            texture.repeat.set(1, 1);
+          }
+          
+          // Appliquer la texture au matériau
+          material.map = texture;
+          material.needsUpdate = true;
+          
+          loadingMessage.style.display = 'none';
+          textureStatus.textContent = 'Texture chargée avec succès';
+          
+          // Cacher le message de statut après 2 secondes
+          setTimeout(() => {
+            textureStatus.style.display = 'none';
+          }, 2000);
+        },
+        undefined,
+        function(err) {
+          // Erreur
+          console.error('Erreur de chargement de la texture:', err);
+          loadingMessage.style.display = 'none';
+          textureStatus.textContent = 'Erreur: Texture non chargée, utilisation de la couleur par défaut';
+          
+          // Cacher le message de statut après 3 secondes
+          setTimeout(() => {
+            textureStatus.style.display = 'none';
+          }, 3000);
+        }
+      );
+    }
+    
+    // Animation
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    
+    // Gestion des redimensionnements
+    function handleResize() {
+      const width = renderContainer.clientWidth;
+      const height = renderContainer.clientHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    }
+    
+    // Écouter les changements dans les champs de configuration
+    tableShapeSelect.addEventListener('change', updateTable);
+    tableWidthInput.addEventListener('change', updateTable);
+    tableLengthInput.addEventListener('change', updateTable);
+    tableLegsSelect.addEventListener('change', updateTable);
+    tableMaterialSelect.addEventListener('change', updateTable);
+    window.addEventListener('resize', handleResize);
+    
+    // Réinitialisation du formulaire
+    resetButton.addEventListener('click', function() {
+      tableShapeSelect.value = 'rectangle';
+      tableWidthInput.value = 80;
+      tableLengthInput.value = 120;
+      tableLegsSelect.value = '4-pieds';
+      tableMaterialSelect.value = 'travertin';
+      updateTable();
+    });
+    
+    // Initialisation
+    initThreeJS();
+  </script>
+</body>
+</html>
